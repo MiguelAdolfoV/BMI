@@ -4,7 +4,6 @@ from getpass import getpass
 import keyboard
 from search_and_copy import *
 #from BMI_Calibration import *
-#from RT_Engagement import *
 import os 
 import shutil
 import subprocess
@@ -285,35 +284,6 @@ def zensync_video_carrousel_relaxation():
     outlet.push_sample(["end_trial"])
     print("sending: end_trial")
 
-def zensync_video_carrousel_cognitive(outlet, datos_procesados):
-    seconds = 10
-    video_values = [0, 0, 0, 0]  # Valores iniciales para cada video
-    threshold = 30
-
-    for i in range(4):
-        outlet.push_sample([f"Start_video_{i+1}"])
-        print(f"sending: Start_video_{i+1}")
-        time.sleep(1)
-        outlet.push_sample(["fadein"])
-        print("sending: fadein")
-        start_time = time.time()
-
-        while time.time() - start_time < seconds:
-            print("Valor de CE:", datos_procesados)
-#            if datos_procesados > threshold:  # Suponiendo que tienes un umbral definido
-#                video_values[i] += 1  # Aumentar el valor si los datos superan el umbral
-
-        outlet.push_sample(["fadeout"])
-        print("sending: fadeout")
-        time.sleep(2)
-
-    max_value = max(video_values)
-    max_index = video_values.index(max_value) + 1
-    video_to_play = f"Start_video_{max_index}"
-    print(f"sending: {video_to_play}")   
-    outlet.push_sample([video_to_play])
-    print(f"Enviando a través del outlet: {video_to_play}")
-
 def zensync_relaxation():
     global directory
     print("**** Calibration Stage ****")
@@ -329,13 +299,7 @@ def zensync_relaxation():
         time.sleep(2)
         print("----> Trial: " + str(i + 1))
 
-        # Procesar datos para cada trial y obtener datos procesados
-        datos_procesados = None  # Aquí deberías procesar tus datos y asignar el resultado a datos_procesados
-        # Por ejemplo, podrías llamar a una función que procese los datos y devuelva un valor
-
-        # Llamar a las funciones del carrousel con los datos procesados
-#        zensync_video_carrousel_relaxation()
-        zensync_video_carrousel_cognitive(outlet, datos_procesados)
+        zensync_video_carrousel_relaxation()
 
     outlet.push_sample(["end_session:zensync"])  # stop_experiment
     print("sending: end_session:zensync")
@@ -348,34 +312,23 @@ def vending_machine_flexible():
     outlet.push_sample(["start_session:vending_machine"])  # start_experiment
     print("sending: start_session:vending_machine")    
 
-    class Producto:
-        def __init__(self, nombre):
-            self.nombre = nombre
-            self.posicion = None  # La posición se generará después
-            self.precio = self.generar_precio()
+        # Inicializamos las variables
+    CEV = 0
+    CEPoints = 0
+    successes = 0
+    failures = 0
+    Threshold = 30
 
-        def generar_posicion(self, posiciones_asignadas):
-            # Generar un número aleatorio entre 1 y 9 para la posición sin repetir
-            posicion_propuesta = random.randint(1, 9)
-            while posicion_propuesta in posiciones_asignadas:
-                posicion_propuesta = random.randint(1, 9)
-            return posicion_propuesta
+    while True:
+        # Simulamos cambios en el valor de CEV (puedes reemplazar esto con tu lógica real)
+        CEV = random.randint(0, 50)
+        print(f"CEV actual: {CEV}")
 
-        def generar_precio(self):
-            # Generar un número aleatorio en intervalos de 100 entre 100 y 1000
-            return random.randrange(100, 1001, 100)
-
-
-    # Definir variables
-    productos_en_exhibicion = 1
-    trial = 1
-    # Crear instancias de la clase Producto
-    productos = Producto.generar_productos()
-    
-    productos_seleccionados = Producto.productos_aleatorios(3)
-    for producto in productos_seleccionados:
-        print(f"Nombre: {producto.nombre}, Precio: ${producto.precio}, Posición: {producto.posicion}")
-
+        # Comparamos CEV con Threshold
+        if CEV > Threshold:
+            CEPoints += 1
+            print(f"CEPoints incrementado a {CEPoints}")
+                
     print("sending: end_session:vending_machine")
     print("End vending_machine routine")
 

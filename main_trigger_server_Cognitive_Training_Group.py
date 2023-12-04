@@ -296,17 +296,14 @@ def zensync_relaxation():
     global directory
     print("**** Calibration Stage ****")
     trials = int(input("How many trials? "))
-    print("Press Enter to start zensync Calibration session...")
+    print("Press Enter to start zensync session...")
     input()  # Wait for user input
     outlet.push_sample(["start_session:zensync"])  # start_experiment
     print("sending: start_session:zensync")    
-    for i in range(trials):
-        outlet.push_sample(["fadeout"])
-        print("sending: fadeout")
-        time.sleep(2)
-        print("----> Trial: "+str(i+1))
-        zensync_video_carrousel()
-        
+    outlet.push_sample(["fadeout"])
+    print("sending: fadeout")
+    time.sleep(2)
+    zensync_video_carrousel()
     outlet.push_sample(["end_session:zensync"])  # stop_experiment
     print("sending: end_session:zensync")
     print("End zensync Calibration routine")
@@ -317,12 +314,14 @@ def vending_machine_flexible():
     print("Press Enter to start zensync Calibration session...")
     input()  # Wait for user input
     outlet.push_sample(["start_session:vending_machine"])  # start_experiment
-    print("sending: start_session:vending_machine")    
-
-    while True:
+    print("sending: start_session:vending_machine")      
+    thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)
+    thread.start()
+    
+    while True: 
         ans = input("Press f to finish the session: ")
-        outlet.push_sample("Cognitive engagement: " + [RT_Engagement.contador])
-        print("sending: Cognitive engagement:"+ RT_Engagement.contador)       
+        outlet.push_sample("Cognitive engagement: " + RT_Engagement.contador.Tostring)
+        print("sending: Cognitive engagement:"+ RT_Engagement.contador.Tostring)       
         if ans.lower() == 'f':
             break  # Sale del bucle si el usuario presiona 'f'
 

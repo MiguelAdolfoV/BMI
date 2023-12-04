@@ -1,4 +1,5 @@
 import pylsl
+import time
 import pandas as pd
 import numpy as np
 import threading
@@ -22,7 +23,7 @@ def enviar_datos_lsl(stream_outlet, dato):
 
 def procesar_datos_eternamente():
     global ultimo_ceng, contador
-    stream_inlet = conectar_stream_lsl("AURA_Power_Power")
+    stream_inlet = conectar_stream_lsl("AURA_Power")
     columnas = ['Canal' + str(i) for i in range(1, 41)]
     df_real_time = pd.DataFrame(columns=columnas)
 
@@ -37,11 +38,12 @@ def procesar_datos_eternamente():
             ultimo_ceng = df_real_time['CEng'].iloc[-1]
             if ultimo_ceng > 0.55:
                 contador += 1
+                time.sleep(1)
             #print(f"Ultimo CEng: {ultimo_ceng}, Contador: {contador}")
             
 
 # Conectar al stream LSL
-stream_inlet = conectar_stream_lsl("AURA_Power_Power")
+stream_inlet = conectar_stream_lsl("AURA_Power")
 hilo_procesamiento = threading.Thread(target=procesar_datos_eternamente)
 hilo_procesamiento.start()
 # Procesar los datos continuamente

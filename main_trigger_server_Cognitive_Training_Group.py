@@ -54,7 +54,7 @@ def realizar_prediccion(features):
 model = joblib.load('zensync_random_forest.pkl') 
 
 # Resolver el stream "AURA_Power"
-canales = pylsl.resolve_stream('name', 'AURA_Power_Power')
+canales = pylsl.resolve_stream('name', 'AURA_Power')
 print("Resolviendo Streams")
 
 if not canales:
@@ -230,15 +230,16 @@ def lab_multitasking():
     outlet.push_sample(["end_session:lab"])  # start_experiment
     print("sending: end_session:lab")
     print("End lab_multitasking routine")
-    
+
 def zensync_video_carrousel():
     seconds = 5
-    video_values = [0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
+    video_values = [0, 0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
+    cognitive_values = [0, 0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
     thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)
     thread.start()
     # Código para manejar el stream LSL
     
-    for i in range(4):
+    for i in range(5):
         # Comenzar cada video
         outlet.push_sample([f"Start_video_{i+1}"])
         print(f"sending: Start_video_{i+1}")
@@ -246,7 +247,7 @@ def zensync_video_carrousel():
         outlet.push_sample(["fadein"])
         print("sending: fadein")
         start_time = time.time()
-
+        contadorInicial = RT_Engagement.contador
         # Procesar muestras de IA durante el video
         while time.time() - start_time < seconds:
             sample, timestamp = entrada.pull_sample()
@@ -254,33 +255,42 @@ def zensync_video_carrousel():
             # Calcular características y realizar predicción
             features = calcular_features(np.array(sample), columnas_a_eliminar)
             prediction = realizar_prediccion(features)
-
             pred = prediction
             if pred == 1:
                 video_values[i] += 1
 
+        contadorFinal = RT_Engagement.contador
+        numeros_en_rango = [i for i in range(contadorInicial, contadorFinal + 1)]
+        cognitive_values[i] = sum(numeros_en_rango)
         outlet.push_sample(["fadeout"])
         print("sending: fadeout")
         time.sleep(2)
-
+        
     # Imprimir los valores finales para cada video
     for i, value in enumerate(video_values, start=1):
-        print(f"Video {i} Value: {value}")
-        
-    # Determinar el video con mayor valor
-    max_value = max(video_values)
-    max_index = video_values.index(max_value) + 1  # +1 porque los índices comienzan en 0
-    video_to_play = f"Start_video_{max_index}"
-    print(f"sending: Start_video_{max_index}")   
+        print(f"Relaxation video {i} Value: {value}")
 
-    # Enviar el nombre del video con mayor valor al outlet
-    outlet.push_sample([video_to_play])
-    print(f"Enviando a través del outlet: {video_to_play}")
+    for i, value in enumerate(cognitive_values, start=1):
+        print(f"Cognitive video {i} Value: {value}")
+
+    # Determinar la posición con la mayor suma de valores
+    suma_valores = [x + y for x, y in zip(video_values, cognitive_values)]
+    max_suma = max(suma_valores)
+    max_suma_index = suma_valores.index(max_suma) + 1  # +1 porque los índices comienzan en 0
+
+    # Obtener los nombres de los videos con mayor valor
+    video_to_play_video = f"Start_video_{max_suma_index}"
+
+    print(f"Sending: {video_to_play_video}")
+
+    # Enviar el nombre del video con mayor suma al outlet
+    outlet.push_sample([video_to_play_video])
+    print(f"Enviando a través del outlet: {video_to_play_video}")
     outlet.push_sample(["fadein"])
     print("sending: fadein")
 
     outlet.push_sample(["end_trial"])
-    print("sending: end_trial")
+    print("sending: end_trial")    
 
 def zensync_relaxation():
     global directory
@@ -296,8 +306,7 @@ def zensync_relaxation():
         time.sleep(2)
         print("----> Trial: "+str(i+1))
         zensync_video_carrousel()
-        print(f"Contador actual: {RT_Engagement.contador}")
-
+        
     outlet.push_sample(["end_session:zensync"])  # stop_experiment
     print("sending: end_session:zensync")
     print("End zensync Calibration routine")
@@ -310,42 +319,16 @@ def vending_machine_flexible():
     outlet.push_sample(["start_session:vending_machine"])  # start_experiment
     print("sending: start_session:vending_machine")    
 
-    class Producto:
-        def __init__(self, nombre):
-            self.nombre = nombre
-            self.posicion = None  # La posición se generará después
-            self.precio = self.generar_precio()
+    while True:
+        ans = input("Press f to finish the session: ")
+        outlet.push_sample("Cognitive engagement: " + [RT_Engagement.contador])
+        print("sending: Cognitive engagement:"+ RT_Engagement.contador)       
+        if ans.lower() == 'f':
+            break  # Sale del bucle si el usuario presiona 'f'
 
-        def generar_posicion(self, posiciones_asignadas):
-            # Generar un número aleatorio entre 1 y 9 para la posición sin repetir
-            posicion_propuesta = random.randint(1, 9)
-            while posicion_propuesta in posiciones_asignadas:
-                posicion_propuesta = random.randint(1, 9)
-            return posicion_propuesta
-
-        def generar_precio(self):
-            # Generar un número aleatorio en intervalos de 100 entre 100 y 1000
-            return random.randrange(100, 1001, 100)
-
-
-    # Definir variables
-    productos_en_exhibicion = 1
-    trial = 1
-    nombres_productos = ["Bottle Label", "Bottle Smooth", "Can Round", "Can Slim", "Candy Bar", "Milk Carton Large", "Milk Carton Small", "Punch Straw Drink", "Snack Bag"]
-
-    # Crear instancias de la clase Producto con los nombres proporcionados
-    productos = [Producto(nombre) for nombre in nombres_productos]
-
-    # Asignar posiciones a cada producto en exhibición sin repetir
-    posiciones_asignadas = set()
-    for producto in productos:
-        producto.posicion = producto.generar_posicion(posiciones_asignadas)
-        posiciones_asignadas.add(producto.posicion)
-
-    # Imprimir información de cada producto
-    for producto in productos:
-        print(f"Nombre: {producto.nombre}, Precio: ${producto.precio}, Posición: {producto.posicion}")
-
+        # El código continuará aquí después de que el usuario presiona 'f'
+        print("Ending session")
+    
     print("sending: end_session:vending_machine")
     print("End vending_machine Calibration routine")
 

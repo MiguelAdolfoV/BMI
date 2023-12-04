@@ -4,6 +4,7 @@ from getpass import getpass
 import keyboard
 from search_and_copy import *
 #from BMI_Calibration import *
+#from RT_Engagement import conectar_stream_lsl, calcular_cognitive_engagement
 import os 
 import shutil
 import subprocess
@@ -48,16 +49,8 @@ def realizar_prediccion(features):
     #print("Predicción:", prediction)
     return prediction
 
-# Cargar el modelo desde el archivo pkl para la función realizar_prediccion
+# Cargar el modelo desde el archivo pkl
 model = joblib.load('zensync_random_forest.pkl') 
-
-# Calcular el engagement cognitivo (función que se debe integrar)
-def calcular_cognitive_engagement(df_real_time):
-    betas = df_real_time.iloc[:, 3::5].mean(axis=1)
-    alphas = df_real_time.iloc[:, 2::5].mean(axis=1)
-    thetas = df_real_time.iloc[:, 1::5].mean(axis=1)
-    df_real_time['CEng'] = betas / (alphas + thetas)
-    return df_real_time
 
 # Resolver el stream "AURA_Power"
 canales = pylsl.resolve_stream('name', 'AURA_Power')
@@ -237,10 +230,12 @@ def lab_multitasking():
     print("sending: end_session:lab")
     print("End lab_multitasking routine")
     
-def zensync_video_carrousel_relaxation():
-    seconds = 10
+def zensync_video_carrousel():
+    seconds = 60
     video_values = [0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
 
+    # Código para manejar el stream LSL
+    
     for i in range(4):
         # Comenzar cada video
         outlet.push_sample([f"Start_video_{i+1}"])
@@ -250,16 +245,17 @@ def zensync_video_carrousel_relaxation():
         print("sending: fadein")
         start_time = time.time()
 
+        # Procesar muestras de IA durante el video
         while time.time() - start_time < seconds:
             sample, timestamp = entrada.pull_sample()
 
-            # Calcular características y realizar predicción para relajación
+            # Calcular características y realizar predicción
             features = calcular_features(np.array(sample), columnas_a_eliminar)
-            prediction = realizar_prediccion(features)  # Supongamos que la predicción indica relajación
-            print("Predicción de relajación: ", prediction)
+            prediction = realizar_prediccion(features)
 
-            if prediction == 1:  # Si la predicción indica un estado de relajación
-                video_values[i] += 1  # Incrementar el valor para el video actual
+            pred = prediction
+            if pred == 1:
+                video_values[i] += 1
 
         outlet.push_sample(["fadeout"])
         print("sending: fadeout")
@@ -268,12 +264,12 @@ def zensync_video_carrousel_relaxation():
     # Imprimir los valores finales para cada video
     for i, value in enumerate(video_values, start=1):
         print(f"Video {i} Value: {value}")
-
+        
     # Determinar el video con mayor valor
     max_value = max(video_values)
-    max_index = video_values.index(max_value) + 1
+    max_index = video_values.index(max_value) + 1  # +1 porque los índices comienzan en 0
     video_to_play = f"Start_video_{max_index}"
-    print(f"sending: Start_video_{max_index}")
+    print(f"sending: Start_video_{max_index}")   
 
     # Enviar el nombre del video con mayor valor al outlet
     outlet.push_sample([video_to_play])
@@ -292,14 +288,12 @@ def zensync_relaxation():
     input()  # Wait for user input
     outlet.push_sample(["start_session:zensync"])  # start_experiment
     print("sending: start_session:zensync")    
-
     for i in range(trials):
         outlet.push_sample(["fadeout"])
         print("sending: fadeout")
         time.sleep(2)
-        print("----> Trial: " + str(i + 1))
-
-        zensync_video_carrousel_relaxation()
+        print("----> Trial: "+str(i+1))
+        zensync_video_carrousel()
 
     outlet.push_sample(["end_session:zensync"])  # stop_experiment
     print("sending: end_session:zensync")
@@ -307,30 +301,50 @@ def zensync_relaxation():
 
 def vending_machine_flexible():
     global directory
-    print("Press Enter to start Vending Machine session...")
+    print("**** Calibration Stage ****")
+    print("Press Enter to start zensync Calibration session...")
     input()  # Wait for user input
     outlet.push_sample(["start_session:vending_machine"])  # start_experiment
     print("sending: start_session:vending_machine")    
 
-        # Inicializamos las variables
-    CEV = 0
-    CEPoints = 0
-    successes = 0
-    failures = 0
-    Threshold = 30
+    class Producto:
+        def __init__(self, nombre):
+            self.nombre = nombre
+            self.posicion = None  # La posición se generará después
+            self.precio = self.generar_precio()
 
-    while True:
-        # Simulamos cambios en el valor de CEV (puedes reemplazar esto con tu lógica real)
-        CEV = random.randint(0, 50)
-        print(f"CEV actual: {CEV}")
+        def generar_posicion(self, posiciones_asignadas):
+            # Generar un número aleatorio entre 1 y 9 para la posición sin repetir
+            posicion_propuesta = random.randint(1, 9)
+            while posicion_propuesta in posiciones_asignadas:
+                posicion_propuesta = random.randint(1, 9)
+            return posicion_propuesta
 
-        # Comparamos CEV con Threshold
-        if CEV > Threshold:
-            CEPoints += 1
-            print(f"CEPoints incrementado a {CEPoints}")
-                
+        def generar_precio(self):
+            # Generar un número aleatorio en intervalos de 100 entre 100 y 1000
+            return random.randrange(100, 1001, 100)
+
+
+    # Definir variables
+    productos_en_exhibicion = 1
+    trial = 1
+    nombres_productos = ["Bottle Label", "Bottle Smooth", "Can Round", "Can Slim", "Candy Bar", "Milk Carton Large", "Milk Carton Small", "Punch Straw Drink", "Snack Bag"]
+
+    # Crear instancias de la clase Producto con los nombres proporcionados
+    productos = [Producto(nombre) for nombre in nombres_productos]
+
+    # Asignar posiciones a cada producto en exhibición sin repetir
+    posiciones_asignadas = set()
+    for producto in productos:
+        producto.posicion = producto.generar_posicion(posiciones_asignadas)
+        posiciones_asignadas.add(producto.posicion)
+
+    # Imprimir información de cada producto
+    for producto in productos:
+        print(f"Nombre: {producto.nombre}, Precio: ${producto.precio}, Posición: {producto.posicion}")
+
     print("sending: end_session:vending_machine")
-    print("End vending_machine routine")
+    print("End vending_machine Calibration routine")
 
 def egg_attention():
     global reading_keyboard

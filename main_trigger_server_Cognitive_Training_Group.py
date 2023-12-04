@@ -3,8 +3,7 @@ from pylsl import StreamInfo, StreamOutlet
 from getpass import getpass
 import keyboard
 from search_and_copy import *
-#from BMI_Calibration import *
-#from RT_Engagement import conectar_stream_lsl, calcular_cognitive_engagement
+#from RT_Engagement import ultimo_ceng
 import os 
 import shutil
 import subprocess
@@ -13,6 +12,8 @@ import pylsl
 import numpy as np
 import pandas as pd
 import joblib
+import RT_Engagement
+import threading
 
 
 # Create a new StreamInfo
@@ -53,7 +54,7 @@ def realizar_prediccion(features):
 model = joblib.load('zensync_random_forest.pkl') 
 
 # Resolver el stream "AURA_Power"
-canales = pylsl.resolve_stream('name', 'AURA_Power')
+canales = pylsl.resolve_stream('name', 'AURA_Power_Power')
 print("Resolviendo Streams")
 
 if not canales:
@@ -231,9 +232,10 @@ def lab_multitasking():
     print("End lab_multitasking routine")
     
 def zensync_video_carrousel():
-    seconds = 60
+    seconds = 5
     video_values = [0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
-
+    thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)
+    thread.start()
     # Código para manejar el stream LSL
     
     for i in range(4):
@@ -294,11 +296,12 @@ def zensync_relaxation():
         time.sleep(2)
         print("----> Trial: "+str(i+1))
         zensync_video_carrousel()
+        print(f"Contador actual: {RT_Engagement.contador}")
 
     outlet.push_sample(["end_session:zensync"])  # stop_experiment
     print("sending: end_session:zensync")
     print("End zensync Calibration routine")
-
+    
 def vending_machine_flexible():
     global directory
     print("**** Calibration Stage ****")

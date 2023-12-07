@@ -309,25 +309,28 @@ def zensync_relaxation():
     print("End zensync Calibration routine")
     
 def vending_machine_flexible():
-    global directory
-    print("**** Calibration Stage ****")
-    print("Press Enter to start zensync Calibration session...")
+    global directory  # Asegúrate de que la variable 'directory' está definida
+
+    print("To stop the session, press the F key after starting the session")
+    print("Press Enter to start Vending Machine session...")
     input()  # Wait for user input
     outlet.push_sample(["start_session:vending_machine"])  # start_experiment
-    print("sending: start_session:vending_machine")      
+    print("sending: start_session:vending_machine")
+
     thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)
     thread.start()
-    
-    while True: 
-        ans = input("Press f to finish the session: ")
-        outlet.push_sample("Cognitive engagement: " + RT_Engagement.contador.Tostring)
-        print("sending: Cognitive engagement:"+ RT_Engagement.contador.Tostring)       
-        if ans.lower() == 'f':
-            break  # Sale del bucle si el usuario presiona 'f'
 
-        # El código continuará aquí después de que el usuario presiona 'f'
-        print("Ending session")
-    
+    while True:
+        sample_value = str(RT_Engagement.contador)  # Convertir a cadena
+        outlet.push_sample([sample_value])  # stop_experiment
+        print(sample_value)
+
+        # Salir del bucle si la tecla "f" está presionada
+        if keyboard.is_pressed('f'):
+            break
+
+    print("Ending session")
+    outlet.push_sample(["end_session:vending_machine"])  # stop_experiment
     print("sending: end_session:vending_machine")
     print("End vending_machine Calibration routine")
 

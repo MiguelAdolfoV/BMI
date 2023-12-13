@@ -322,7 +322,7 @@ def vending_machine_flexible():
 
     while True:
         sample_value = str(RT_Engagement.contador)  # Convertir a cadena
-        outlet.push_sample([sample_value])  # stop_experiment
+        outlet.push_sample([sample_value])
         print(sample_value)
 
         # Salir del bucle si la tecla "f" está presionada

@@ -3,7 +3,7 @@ from pylsl import StreamInfo, StreamOutlet
 from getpass import getpass
 import keyboard
 from search_and_copy import *
-#from BMI_Calibration import *
+#from RT_Engagement import ultimo_ceng
 import os 
 import shutil
 import subprocess
@@ -12,6 +12,8 @@ import pylsl
 import numpy as np
 import pandas as pd
 import joblib
+import RT_Engagement
+import threading
 
 
 # Create a new StreamInfo
@@ -48,16 +50,8 @@ def realizar_prediccion(features):
     #print("Predicción:", prediction)
     return prediction
 
-# Cargar el modelo desde el archivo pkl para la función realizar_prediccion
+# Cargar el modelo desde el archivo pkl
 model = joblib.load('zensync_random_forest.pkl') 
-
-# Calcular el engagement cognitivo (función que se debe integrar)
-def calcular_cognitive_engagement(df_real_time):
-    betas = df_real_time.iloc[:, 3::5].mean(axis=1)
-    alphas = df_real_time.iloc[:, 2::5].mean(axis=1)
-    thetas = df_real_time.iloc[:, 1::5].mean(axis=1)
-    df_real_time['CEng'] = betas / (alphas + thetas)
-    return df_real_time
 
 # Resolver el stream "AURA_Power"
 canales = pylsl.resolve_stream('name', 'AURA_Power')
@@ -236,12 +230,16 @@ def lab_multitasking():
     outlet.push_sample(["end_session:lab"])  # start_experiment
     print("sending: end_session:lab")
     print("End lab_multitasking routine")
-    
-def zensync_video_carrousel_relaxation():
-    seconds = 10
-    video_values = [0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
 
-    for i in range(4):
+def zensync_video_carrousel():
+    seconds = 15
+    video_values = [0, 0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
+    cognitive_values = [0, 0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
+    thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)
+    thread.start()
+    # Código para manejar el stream LSL
+    
+    for i in range(5):
         # Comenzar cada video
         outlet.push_sample([f"Start_video_{i+1}"])
         print(f"sending: Start_video_{i+1}")
@@ -249,88 +247,92 @@ def zensync_video_carrousel_relaxation():
         outlet.push_sample(["fadein"])
         print("sending: fadein")
         start_time = time.time()
-
+        contadorInicial = RT_Engagement.contador
+        # Procesar muestras de IA durante el video
         while time.time() - start_time < seconds:
             sample, timestamp = entrada.pull_sample()
 
-            # Calcular características y realizar predicción para relajación
+            # Calcular características y realizar predicción
             features = calcular_features(np.array(sample), columnas_a_eliminar)
-            prediction = realizar_prediccion(features)  # Supongamos que la predicción indica relajación
-            print("Predicción de relajación: ", prediction)
+            prediction = realizar_prediccion(features)
+            pred = prediction
+            if pred == 1:
+                video_values[i] += 1
 
-            if prediction == 1:  # Si la predicción indica un estado de relajación
-                video_values[i] += 1  # Incrementar el valor para el video actual
-
+        contadorFinal = RT_Engagement.contador
+        numeros_en_rango = [i for i in range(contadorInicial, contadorFinal + 1)]
+        cognitive_values[i] = sum(numeros_en_rango)
         outlet.push_sample(["fadeout"])
         print("sending: fadeout")
         time.sleep(2)
-
+        
     # Imprimir los valores finales para cada video
     for i, value in enumerate(video_values, start=1):
-        print(f"Video {i} Value: {value}")
+        print(f"Relaxation video {i} Value: {value}")
 
-    # Determinar el video con mayor valor
-    max_value = max(video_values)
-    max_index = video_values.index(max_value) + 1
-    video_to_play = f"Start_video_{max_index}"
-    print(f"sending: Start_video_{max_index}")
+    for i, value in enumerate(cognitive_values, start=1):
+        print(f"Cognitive video {i} Value: {value}")
 
-    # Enviar el nombre del video con mayor valor al outlet
-    outlet.push_sample([video_to_play])
-    print(f"Enviando a través del outlet: {video_to_play}")
+    # Determinar la posición con la mayor suma de valores
+    suma_valores = [x + y for x, y in zip(video_values, cognitive_values)]
+    max_suma = max(suma_valores)
+    max_suma_index = suma_valores.index(max_suma) + 1  # +1 porque los índices comienzan en 0
+
+    # Obtener los nombres de los videos con mayor valor
+    video_to_play_video = f"Start_video_{max_suma_index}"
+
+    print(f"Sending: {video_to_play_video}")
+
+    # Enviar el nombre del video con mayor suma al outlet
+    outlet.push_sample([video_to_play_video])
+    print(f"Enviando a través del outlet: {video_to_play_video}")
     outlet.push_sample(["fadein"])
     print("sending: fadein")
 
     outlet.push_sample(["end_trial"])
-    print("sending: end_trial")
+    print("sending: end_trial")    
 
 def zensync_relaxation():
     global directory
     print("**** Calibration Stage ****")
     trials = int(input("How many trials? "))
-    print("Press Enter to start zensync Calibration session...")
+    print("Press Enter to start zensync session...")
     input()  # Wait for user input
     outlet.push_sample(["start_session:zensync"])  # start_experiment
     print("sending: start_session:zensync")    
-
-    for i in range(trials):
-        outlet.push_sample(["fadeout"])
-        print("sending: fadeout")
-        time.sleep(2)
-        print("----> Trial: " + str(i + 1))
-
-        zensync_video_carrousel_relaxation()
-
+    outlet.push_sample(["fadeout"])
+    print("sending: fadeout")
+    time.sleep(2)
+    zensync_video_carrousel()
     outlet.push_sample(["end_session:zensync"])  # stop_experiment
     print("sending: end_session:zensync")
     print("End zensync Calibration routine")
-
+    
 def vending_machine_flexible():
-    global directory
+    global directory  # Asegúrate de que la variable 'directory' está definida
+
+    print("To stop the session, press the F key after starting the session")
     print("Press Enter to start Vending Machine session...")
     input()  # Wait for user input
     outlet.push_sample(["start_session:vending_machine"])  # start_experiment
-    print("sending: start_session:vending_machine")    
+    print("sending: start_session:vending_machine")
 
-        # Inicializamos las variables
-    CEV = 0
-    CEPoints = 0
-    successes = 0
-    failures = 0
-    Threshold = 30
+    thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)
+    thread.start()
 
     while True:
-        # Simulamos cambios en el valor de CEV (puedes reemplazar esto con tu lógica real)
-        CEV = random.randint(0, 50)
-        print(f"CEV actual: {CEV}")
+        sample_value = str(RT_Engagement.contador)  # Convertir a cadena
+        outlet.push_sample([sample_value])
+        print(sample_value)
 
-        # Comparamos CEV con Threshold
-        if CEV > Threshold:
-            CEPoints += 1
-            print(f"CEPoints incrementado a {CEPoints}")
-                
+        # Salir del bucle si la tecla "f" está presionada
+        if keyboard.is_pressed('f'):
+            break
+
+    print("Ending session")
+    outlet.push_sample(["end_session:vending_machine"])  # stop_experiment
     print("sending: end_session:vending_machine")
-    print("End vending_machine routine")
+    print("End vending_machine Calibration routine")
 
 def egg_attention():
     global reading_keyboard

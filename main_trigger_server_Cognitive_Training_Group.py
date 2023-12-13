@@ -232,7 +232,7 @@ def lab_multitasking():
     print("End lab_multitasking routine")
 
 def zensync_video_carrousel():
-    seconds = 5
+    seconds = 15
     video_values = [0, 0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
     cognitive_values = [0, 0, 0, 0, 0]  # video_1_value, video_2_value, video_3_value, video_4_value
     thread = threading.Thread(target=RT_Engagement.procesar_datos_eternamente)

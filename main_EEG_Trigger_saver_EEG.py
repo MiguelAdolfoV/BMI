@@ -29,8 +29,8 @@ def esperar_stream():
 
     
     # Resolver el stream "AURA_Power"
-    canales = pylsl.resolve_stream('name', 'AURA_Power')
-    canales_EEG= pylsl.resolve_stream('name', 'AURA_Filtered')
+    canales = pylsl.resolve_stream('name', 'AURA_Power_Power')
+    canales_EEG= pylsl.resolve_stream('name', 'AURA_Power_Power')
 
     print("Resolviendo Streams")
 #    canales = pylsl.resolve_stream('name', 'AURA')

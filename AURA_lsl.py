@@ -1,7 +1,7 @@
 from pylsl import StreamInlet, resolve_stream
 
 print("looking for an EEG stream...")
-brain_stream = resolve_stream("name", "AURA_Power")
+brain_stream = resolve_stream("name", "AURA_Power_Power")
 
 brain_inlet = StreamInlet(brain_stream[0])
 brain_inlet.open_stream()

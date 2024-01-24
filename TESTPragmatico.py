@@ -17,7 +17,7 @@ directory = 'participants/'
 participation_id=""
 script_path = 'BMI_Control_Sender.py'
 model = joblib.load('zensync_random_forest.pkl') 
-canales = pylsl.resolve_stream('name', 'AURA_Power')
+canales = pylsl.resolve_stream('name', 'AURA_Power_Power')
 print("Resolviendo Streams")
 
 if not canales:
@@ -40,10 +40,20 @@ def realizar_prediccion(features):
     return prediction
 
 def calcular_cognitive_engagement(df_real_time):
-    betas = df_real_time.iloc[:, 3::5].mean(axis=1)
-    alphas = df_real_time.iloc[:, 2::5].mean(axis=1)
-    thetas = df_real_time.iloc[:, 1::5].mean(axis=1)
-    df_real_time['CEng'] = betas / (alphas + thetas)
+    alphas = df_real_time.iloc[:, 17:20].mean(axis=1)
+    thetas = df_real_time.iloc[:, 9:12].mean(axis=1)
+    df_real_time['CEng'] = thetas/alphas
+    return df_real_time
+
+def calcular_cognitive_engagement2(df_real_time):
+    num_pares = 3
+    theta_alpha_ratios = []
+    for i in range(num_pares):
+        alpha = df_real_time.iloc[:, 17 + i]
+        theta = df_real_time.iloc[:, 9 + i]
+        ratio = theta / alpha
+        theta_alpha_ratios.append(ratio)
+    df_real_time['CEng'] = pd.concat(theta_alpha_ratios, axis=1).mean(axis=1)
     return df_real_time
 
 def read_keyboard(event):
@@ -73,54 +83,74 @@ def display_menu():
     return option
 
 def zensync_video_carrousel_relaxation():
-    seconds = 40
-    video_values = [0, 0, 0, 0]
-    for i in range(4):
+    seconds = 10
+    max_avg_engagement_value = -1
+    max_avg_engagement_index = -1
+    avg_engagements = []  # Lista para almacenar los promedios de cada video
+
+    for i in range(7):
         outlet.push_sample([f"Start_video_{i+1}"])
         print(f"sending: Start_video_{i+1}")
         time.sleep(1)
         outlet.push_sample(["fadein"])
         print("sending: fadein")
         start_time = time.time()
+        df_real_time = pd.DataFrame() 
+        engagement_values = []
+        
         while time.time() - start_time < seconds:
             sample, timestamp = entrada.pull_sample()
-            features = calcular_features(np.array(sample), columnas_a_eliminar)
-            prediction = realizar_prediccion(features)  
-            print("Predicción de relajación: ", prediction)
-            if prediction == 1:  
-                video_values[i] += 1  
+            df_real_time = pd.concat([df_real_time, pd.DataFrame([sample])], ignore_index=True)
+            
+            if time.time() - start_time >= 2:  # Calcular después de 2 segundos
+                df_engagement = calcular_cognitive_engagement(df_real_time)
+                current_engagement = df_engagement['CEng'].iloc[-1] 
+                engagement_values.append(current_engagement)
+                print("Current Relaxation: ", current_engagement)
+        
+        avg_engagement = sum(engagement_values) / len(engagement_values) if engagement_values else 0
+        
+        print(f"Average Relaxation for video {i+1}: ", avg_engagement)
+        avg_engagements.append(avg_engagement)  # Añadir al listado de promedios
+        
+        # Añadir al listado de promedios y actualizar el máximo solo si no es el primer ni el último video
+        if i != 0 and i != 6:  # Excluir el primer y último video
+            avg_engagements.append(avg_engagement)
+            if avg_engagement > max_avg_engagement_value:
+                max_avg_engagement_value = avg_engagement
+                max_avg_engagement_index = i
+
         outlet.push_sample(["fadeout"])
         print("sending: fadeout")
         time.sleep(2)
-    for i, value in enumerate(video_values, start=1):
-        print(f"Video {i} Value: {value}")
-    max_value = max(video_values)
-    max_index = video_values.index(max_value) + 1
-    video_to_play = f"Start_video_{max_index}"
-    print(f"sending: Start_video_{max_index}")
+
+    video_to_play = f"Start_video_{max_avg_engagement_index + 1}"
+    print(f"sending: {video_to_play}")
     outlet.push_sample([video_to_play])
-    print(f"Enviando a través del outlet: {video_to_play}")
     outlet.push_sample(["fadein"])
     print("sending: fadein")
     outlet.push_sample(["end_trial"])
     print("sending: end_trial")
+
+    # Imprimir los promedios individuales de relajación para cada video
+    for i, avg_engagement in enumerate(avg_engagements):
+        print(f"Average Relaxation for video {i+1}: {avg_engagement:.2f}")
 
 def zensync_relaxation():
     global directory
     print("**** Calibration Stage ****")
     trials = int(input("How many trials? "))
     print("Press Enter to start zensync Calibration session...")
-    input()  # Wait for user input
-    outlet.push_sample(["start_session:zensync"])  # start_experiment
+    input()  
+    outlet.push_sample(["start_session:zensync"])  
     print("sending: start_session:zensync")    
     for i in range(trials):
         outlet.push_sample(["fadeout"])
         print("sending: fadeout")
         time.sleep(2)
         print("----> Trial: " + str(i + 1))
-
         zensync_video_carrousel_relaxation()
-    outlet.push_sample(["end_session:zensync"])  # stop_experiment
+    outlet.push_sample(["end_session:zensync"])  
     print("sending: end_session:zensync")
     print("End zensync Calibration routine")
 
